@@ -1,26 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import { HashRouter, Routes, Route } from "react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LandingPage } from "./components/LandingPage";
 import { ScanningPage } from "./components/ScanningPage";
 import { ResultsPage } from "./components/ResultsPage";
 import { postMessage } from "./vscode";
-import { Layout } from "./dashboard/layout/Layout";
-import { ThemeProvider } from "./dashboard/theme-context";
-import { galaxySunsetTheme } from "./dashboard/themes";
-import Dashboard from "./dashboard/pages/Dashboard";
-import Endpoints from "./dashboard/pages/Endpoints";
-import Suggestions from "./dashboard/pages/Suggestions";
-import Graph from "./dashboard/pages/Graph";
-import AiChat from "./dashboard/pages/AiChat";
-import Projects from "./dashboard/pages/Projects";
-import type { Suggestion as SuggestionType, ScanSummary, EndpointRecord, HostMessage } from "./types";
-
-const queryClient = new QueryClient();
+import type { Suggestion, ScanSummary, EndpointRecord, HostMessage } from "./types";
 
 type Screen = "landing" | "scanning" | "results";
 
-function ScanApp() {
+export default function App() {
   const [screen, setScreen] = useState<Screen>("landing");
 
   // Scanning state
@@ -31,7 +18,7 @@ function ScanApp() {
 
   // Results state
   const [endpoints, setEndpoints] = useState<EndpointRecord[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionType[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [summary, setSummary] = useState<ScanSummary>({
     totalEndpoints: 0,
     totalCallsPerDay: 0,
@@ -96,8 +83,6 @@ function ScanApp() {
     return () => window.removeEventListener("message", handler);
   }, [screen]);
 
-  void handleRescan;
-
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {screen === "landing" && <LandingPage onStartScan={handleStartScan} />}
@@ -117,32 +102,5 @@ function ScanApp() {
         />
       )}
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <Routes>
-          <Route path="/" element={<ScanApp />} />
-          <Route
-            path="/projects"
-            element={
-              <ThemeProvider theme={galaxySunsetTheme}>
-                <Projects />
-              </ThemeProvider>
-            }
-          />
-          <Route path="/projects/:projectId" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="endpoints" element={<Endpoints />} />
-            <Route path="suggestions" element={<Suggestions />} />
-            <Route path="graph" element={<Graph />} />
-            <Route path="chat" element={<AiChat />} />
-          </Route>
-        </Routes>
-      </HashRouter>
-    </QueryClientProvider>
   );
 }

@@ -9,16 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.90.21",
     "@vscode/codicons": "^0.0.36",
     "dompurify": "^3.2.0",
-    "lucide-react": "^0.575.0",
     "marked": "^15.0.0",
-    "motion": "^12.34.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router": "^7.13.1",
-    "tailwind-merge": "^3.5.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
