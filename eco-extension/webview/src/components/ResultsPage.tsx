@@ -192,7 +192,6 @@ function SuggestionCard({
                   style={{ fontSize: "11px" }}
                   onClick={() => postMessage({ type: "openFile", file: f })}
                 >
-                  <span className="codicon codicon-file-code" style={{ fontSize: "11px" }} />
                   {f}
                 </button>
               ))}
@@ -210,9 +209,11 @@ function SuggestionCard({
               marginTop: "10px",
               gap: "4px",
               display: "flex",
+              justifyContent: "flex-start",
               alignItems: "center",
               color: "var(--vscode-textLink-foreground)",
               fontSize: "11px",
+              padding: "4px 0",
             }}
           >
             <span className="codicon codicon-comment" style={{ fontSize: "12px" }} />
@@ -273,11 +274,11 @@ function SeverityGroup({
   );
 }
 
-function EndpointsList({ endpoints }: { endpoints: EndpointRecord[] }) {
+function EndpointsList({ endpoints, topBorder }: { endpoints: EndpointRecord[]; topBorder: boolean }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ borderTop: "1px solid var(--vscode-panel-border)" }}>
+    <div style={topBorder ? { borderTop: "1px solid var(--vscode-panel-border)" } : undefined}>
       <button className="eco-section-header" onClick={() => setOpen((v) => !v)}>
         <span
           className={`codicon ${open ? "codicon-chevron-down" : "codicon-chevron-right"}`}
@@ -427,7 +428,7 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {suggestions.length === 0 ? (
             <div
               style={{
@@ -451,7 +452,7 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
             </>
           )}
 
-          {endpoints.length > 0 && <EndpointsList endpoints={endpoints} />}
+          {endpoints.length > 0 && <EndpointsList endpoints={endpoints} topBorder={suggestions.length === 0} />}
         </div>
       </div>
 

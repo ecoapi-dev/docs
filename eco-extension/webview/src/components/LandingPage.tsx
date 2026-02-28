@@ -46,7 +46,7 @@ export function LandingPage({ onStartScan }: LandingPageProps) {
         onClick={onStartScan}
         style={{ marginTop: "24px" }}
       >
-        <span className="codicon codicon-search" />
+        <span className="codicon codicon-refresh" />
         Scan Workspace
       </button>
     </div>

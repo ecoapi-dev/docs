@@ -22,7 +22,6 @@ export async function scanWorkspace(
   );
 
   const uris = await vscode.workspace.findFiles(includeGlob, excludeGlob, MAX_FILES);
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
   const allCalls: ApiCallInput[] = [];
 
   for (let i = 0; i < uris.length; i++) {
@@ -40,6 +39,9 @@ export async function scanWorkspace(
 
         for (const match of matches) {
           const inLoop = isInsideLoop(lines, lineIndex);
+          const snippetStart = Math.max(0, lineIndex - 2);
+          const snippetEnd = Math.min(lines.length - 1, lineIndex + 2);
+          const codeSnippet = lines.slice(snippetStart, snippetEnd + 1).join("\n");
           allCalls.push({
             file: relativePath,
             line: lineIndex + 1,
@@ -47,6 +49,7 @@ export async function scanWorkspace(
             url: match.url,
             library: match.library,
             frequency: inLoop ? "per-request" : "daily",
+            codeSnippet,
           });
         }
       }

@@ -72,6 +72,19 @@ const pickStatus = (flags: Set<EndpointStatus>): EndpointStatus => {
   return priority.find((status) => flags.has(status)) ?? "normal";
 };
 
+const fenced = (code: string, lang = "typescript"): string =>
+  `\`\`\`${lang}\n${code}\n\`\`\``;
+
+const siteRef = (call: ApiCallInput): string =>
+  `\`${call.file}:${call.line}\``;
+
+const withSnippet = (call: ApiCallInput, fixLines: string[]): string => {
+  const header = call.codeSnippet
+    ? `// Detected (${call.file}:${call.line}):\n${call.codeSnippet}\n\n`
+    : `// Detected at ${call.file}:${call.line}\n\n`;
+  return fenced(header + fixLines.join("\n"));
+};
+
 export const analyzeApiCalls = (
   projectId: string,
   scanId: string,
@@ -112,7 +125,8 @@ export const analyzeApiCalls = (
         file: call.file,
         line: call.line,
         library: call.library,
-        frequency: call.frequency
+        frequency: call.frequency,
+        codeSnippet: call.codeSnippet,
       })),
       callsPerDay: roundCurrency(callsPerDay),
       monthlyCost,
@@ -155,25 +169,41 @@ export const analyzeApiCalls = (
 
     if (calls.length > 1 || uniqueFiles.size > 1) {
       endpointStatuses.get(key)?.add("redundant");
+      const sites = calls.slice(0, 3).map(siteRef).join(", ");
       pushSuggestion(
         "redundancy",
         calls.length > 3 ? "high" : "medium",
         [endpoint],
-        `Endpoint ${endpoint.method} ${endpoint.url} appears multiple times across code paths.`,
+        `\`${endpoint.method} ${endpoint.url}\` is called from ${calls.length} places (${sites}). Consolidate into a shared service to avoid redundant requests.`,
         endpoint.monthlyCost * 0.2,
-        "Create a shared API utility and deduplicate duplicate call sites."
+        withSnippet(calls[0], [
+          "// Move this call into a shared module:",
+          `export const fetch${endpoint.url.split("/").pop()?.replace(/[^a-zA-Z]/g, "") || "Data"} = () =>`,
+          `  fetch("${endpoint.url}").then(r => r.json());`,
+        ])
       );
     }
 
     if (endpoint.method === "GET" && uniqueFiles.size >= 2) {
       endpointStatuses.get(key)?.add("cacheable");
+      const sites = calls.slice(0, 2).map(siteRef).join(" and ");
       pushSuggestion(
         "cache",
         "medium",
         [endpoint],
-        `GET ${endpoint.url} is used in multiple files and is a strong cache candidate.`,
+        `\`GET ${endpoint.url}\` is fetched from ${uniqueFiles.size} files (${sites}) on every call. Caching responses would eliminate redundant network requests.`,
         endpoint.monthlyCost * 0.35,
-        "Add a cache layer (memory/Redis) keyed by URL and relevant params."
+        withSnippet(calls[0], [
+          "// Add an in-memory cache around this call:",
+          "const _cache = new Map<string, { v: unknown; exp: number }>();",
+          `async function cachedGet(url: string) {`,
+          "  const hit = _cache.get(url);",
+          "  if (hit && hit.exp > Date.now()) return hit.v;",
+          "  const v = await fetch(url).then(r => r.json());",
+          "  _cache.set(url, { v, exp: Date.now() + 5 * 60_000 }); // 5 min TTL",
+          "  return v;",
+          "}",
+        ])
       );
     }
 
@@ -183,9 +213,19 @@ export const analyzeApiCalls = (
         "n_plus_one",
         "high",
         [endpoint],
-        `Endpoint ${endpoint.url} has very high daily frequency and may be inside a loop.`,
+        `\`${endpoint.url}\` fires ~${Math.round(endpoint.callsPerDay).toLocaleString()} times/day — likely inside a loop. Replace with a single batched request to drastically cut API calls.`,
         endpoint.monthlyCost * 0.4,
-        "Refactor to prefetch or aggregate data before iteration."
+        withSnippet(calls[0], [
+          "// Instead of calling per-item inside a loop:",
+          "// for (const id of ids) { await fetch(`.../${id}`); }",
+          "",
+          "// Fetch all at once:",
+          `const results = await fetch(\`${endpoint.url.replace(/\/:[^/]+/, "")}?ids=\${ids.join(",")}\`)`,
+          "  .then(r => r.json());",
+          "",
+          "// Or in parallel (if no bulk endpoint):",
+          "const results = await Promise.all(ids.map(id => fetch(`.../${id}`)));",
+        ])
       );
     }
   }

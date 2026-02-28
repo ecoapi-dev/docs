@@ -25,7 +25,7 @@ html, body, #root {
 }
 
 .eco-tab {
-  padding: 6px 16px;
+  padding: 6px 12px;
   font-family: var(--vscode-font-family);
   font-size: 11px;
   background: transparent;
@@ -281,7 +281,7 @@ html, body, #root {
 }
 
 .eco-suggestion-body {
-  padding: 8px 12px 12px 26px;
+  padding: 8px 12px 12px 12px;
   border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
 }
 

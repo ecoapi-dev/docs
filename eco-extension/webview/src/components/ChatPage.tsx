@@ -12,6 +12,27 @@ interface Message {
   content: string;
 }
 
+const MODEL_GROUPS = [
+  {
+    label: "GPT",
+    models: [
+      { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+      { id: "gpt-4o", name: "GPT-4o" },
+      { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+      { id: "gpt-4.1", name: "GPT-4.1" },
+    ],
+  },
+  {
+    label: "Reasoning",
+    models: [
+      { id: "o1-mini", name: "o1 Mini" },
+      { id: "o3-mini", name: "o3 Mini" },
+      { id: "o1", name: "o1" },
+      { id: "o3", name: "o3" },
+    ],
+  },
+];
+
 function getSavedModel(): string {
   const state = getVsCodeApi().getState() as { model?: string } | null;
   return state?.model ?? "gpt-4o-mini";
@@ -26,6 +47,7 @@ export function ChatPage({ context }: ChatPageProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const [model, setModel] = useState(getSavedModel);
 
   // Onboarding state
@@ -74,15 +96,21 @@ export function ChatPage({ context }: ChatPageProps) {
     const handler = (event: MessageEvent) => {
       const msg = event.data as HostMessage;
       switch (msg.type) {
-        case "chatResponse":
+        case "chatStreaming":
+          setStreamingContent((prev) => prev + msg.chunk);
+          break;
+
+        case "chatDone":
           setIsLoading(false);
-          setMessages((prev) => [...prev, { role: "ai", content: msg.text }]);
+          setStreamingContent("");
+          setMessages((prev) => [...prev, { role: "ai", content: msg.fullContent }]);
           pendingMessageRef.current = null;
           pendingAddedToUI.current = false;
           break;
 
         case "chatError":
           setIsLoading(false);
+          setStreamingContent("");
           setMessages((prev) => [
             ...prev,
             { role: "ai", content: `**Error:** ${msg.message}` },
@@ -132,7 +160,7 @@ export function ChatPage({ context }: ChatPageProps) {
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, streamingContent]);
 
   // Send a chat request, optionally adding the user message to the UI first
   const sendChatRequest = (text: string, addToUI = true) => {
@@ -209,7 +237,7 @@ export function ChatPage({ context }: ChatPageProps) {
 
       {showOnboarding ? (
         /* Onboarding card */
-        <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
+        <div style={{ flex: 1, padding: "16px", overflowY: "auto", minHeight: 0 }}>
           <div
             style={{
               border: "1px solid var(--vscode-input-border)",
@@ -278,6 +306,7 @@ export function ChatPage({ context }: ChatPageProps) {
           style={{
             flex: 1,
             overflowY: "auto",
+            minHeight: 0,
             padding: "12px",
             display: "flex",
             flexDirection: "column",
@@ -326,9 +355,9 @@ export function ChatPage({ context }: ChatPageProps) {
             </div>
           ))}
 
-          {/* Loading indicator */}
+          {/* Streaming / loading indicator */}
           {isLoading && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", maxWidth: "100%", width: "100%" }}>
               <span
                 style={{
                   fontSize: "10px",
@@ -338,9 +367,15 @@ export function ChatPage({ context }: ChatPageProps) {
               >
                 eco
               </span>
-              <span style={{ color: "var(--vscode-descriptionForeground)", fontSize: "var(--vscode-font-size)" }}>
-                …
-              </span>
+              {streamingContent ? (
+                <div style={{ maxWidth: "100%", width: "100%" }}>
+                  <Markdown content={streamingContent} />
+                </div>
+              ) : (
+                <span style={{ color: "var(--vscode-descriptionForeground)", fontSize: "var(--vscode-font-size)" }}>
+                  …
+                </span>
+              )}
             </div>
           )}
 
@@ -385,18 +420,26 @@ export function ChatPage({ context }: ChatPageProps) {
             style={{
               background: "var(--vscode-dropdown-background)",
               color: "var(--vscode-dropdown-foreground)",
-              border: "1px solid var(--vscode-dropdown-border)",
+              border: "1px solid var(--vscode-dropdown-border, var(--vscode-input-border))",
               borderRadius: "3px",
-              padding: "0 4px",
+              padding: "0 6px",
               height: "28px",
               fontSize: "11px",
+              fontFamily: "var(--vscode-font-family)",
               flexShrink: 0,
               cursor: isLoading ? "not-allowed" : "pointer",
               opacity: isLoading ? 0.5 : 1,
+              outline: "none",
+              maxWidth: "120px",
             }}
           >
-            <option value="gpt-4o-mini">GPT-4o Mini</option>
-            <option value="gpt-4o">GPT-4o</option>
+            {MODEL_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
           <button
             className="eco-btn-icon"

@@ -7,8 +7,14 @@ import type { WebviewMessage, HostMessage } from "./messages";
 import type { EndpointRecord, Suggestion, ScanSummary } from "./analysis/types";
 
 const MODELS = {
-  "gpt-4o": { id: "gpt-4o", name: "GPT-4o" },
   "gpt-4o-mini": { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+  "gpt-4o": { id: "gpt-4o", name: "GPT-4o" },
+  "gpt-4.1-mini": { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+  "gpt-4.1": { id: "gpt-4.1", name: "GPT-4.1" },
+  "o1-mini": { id: "o1-mini", name: "o1 Mini" },
+  "o3-mini": { id: "o3-mini", name: "o3 Mini" },
+  "o1": { id: "o1", name: "o1" },
+  "o3": { id: "o3", name: "o3" },
 } as const;
 
 type ModelId = keyof typeof MODELS;
