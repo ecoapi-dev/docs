@@ -1,5 +1,4 @@
-const BASE_URL = "https://api.ecoapi.dev";
-// const BASE_URL = "http://localhost:8787"; // use this for local development
+const BASE_URL = import.meta.env.VITE_LOCAL_MODE ? "" : "https://api.ecoapi.dev";
 
 export class ApiError extends Error {
   code: string;
