@@ -2,6 +2,8 @@
 
 REST API for analyzing codebase API usage, estimating cost, detecting inefficiencies, and generating optimization suggestions.
 
+![Alt text](docpages/public/landingpage.png)
+
 ## Why This Exists
 
 Developers often ship API-heavy features without visibility into:
