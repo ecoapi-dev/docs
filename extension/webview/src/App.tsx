@@ -25,14 +25,30 @@ export default function App() {
     totalMonthlyCost: 0,
     highRiskCount: 0,
   });
+  const [aiReviewRunning, setAiReviewRunning] = useState(false);
+  const [aiReviewStage, setAiReviewStage] = useState<string>("");
+  const [aiReviewError, setAiReviewError] = useState<string>("");
+  const [aiReviewStats, setAiReviewStats] = useState<{ added: number; filtered: number } | null>(null);
 
   const handleStartScan = useCallback(() => {
     setScanFiles([]);
     setScanIndex(0);
     setScanTotal(0);
     setEndpointCount(0);
+    setAiReviewRunning(false);
+    setAiReviewStage("");
+    setAiReviewError("");
+    setAiReviewStats(null);
     setScreen("scanning");
     postMessage({ type: "startScan" });
+  }, []);
+
+  const handleRunAiReview = useCallback(() => {
+    setAiReviewRunning(true);
+    setAiReviewStage("Starting AI review...");
+    setAiReviewError("");
+    setAiReviewStats(null);
+    postMessage({ type: "runAiReview" });
   }, []);
 
   const handleRescan = useCallback(() => {
@@ -71,6 +87,23 @@ export default function App() {
           setTimeout(() => setScreen("results"), 300);
           break;
 
+        case "aiReviewProgress":
+          setAiReviewRunning(true);
+          setAiReviewStage(msg.stage);
+          break;
+
+        case "aiReviewComplete":
+          setAiReviewRunning(false);
+          setAiReviewStage("");
+          setAiReviewStats({ added: msg.added, filtered: msg.filtered });
+          break;
+
+        case "aiReviewError":
+          setAiReviewRunning(false);
+          setAiReviewStage("");
+          setAiReviewError(msg.message);
+          break;
+
         case "error":
           if (screen === "scanning") {
             setScreen("landing");
@@ -81,7 +114,7 @@ export default function App() {
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [screen]);
+  }, [screen, handleStartScan]);
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -99,6 +132,11 @@ export default function App() {
           endpoints={endpoints}
           suggestions={suggestions}
           summary={summary}
+          onRunAiReview={handleRunAiReview}
+          aiReviewRunning={aiReviewRunning}
+          aiReviewStage={aiReviewStage}
+          aiReviewError={aiReviewError}
+          aiReviewStats={aiReviewStats}
         />
       )}
     </div>

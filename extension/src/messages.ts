@@ -3,6 +3,7 @@ import type { EndpointRecord, Suggestion, ScanSummary } from "./analysis/types";
 // Webview -> Host messages
 export type WebviewMessage =
   | { type: "startScan" }
+  | { type: "runAiReview" }
   | { type: "openDashboard" }
   | { type: "chat"; text: string; model: string }
   | { type: "setApiKey"; key: string }
@@ -27,6 +28,9 @@ export type HostMessage =
   | { type: "scanProgress"; file: string; index: number; total: number; endpointsSoFar: number }
   | { type: "scanComplete" }
   | { type: "scanResults"; endpoints: EndpointRecord[]; suggestions: Suggestion[]; summary: ScanSummary }
+  | { type: "aiReviewProgress"; stage: string; current?: number; total?: number }
+  | { type: "aiReviewComplete"; added: number; filtered: number }
+  | { type: "aiReviewError"; message: string }
   | { type: "chatStreaming"; chunk: string }
   | { type: "chatDone"; fullContent: string }
   | { type: "chatError"; message: string }

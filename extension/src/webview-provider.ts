@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { scanWorkspace, detectLocalWastePatterns } from "./scanner/workspace-scanner";
+import { scanWorkspace, detectLocalWastePatterns, readWorkspaceFileExcerpt } from "./scanner/workspace-scanner";
 import { createProject, submitScan, getAllEndpoints, getAllSuggestions } from "./api-client";
 import { buildSystemPrompt } from "./chat/prompts";
 import { LocalServer } from "./local-server";
@@ -30,6 +30,71 @@ function isReasoningModel(model: string): boolean {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+interface AiFinding {
+  type: Suggestion["type"];
+  severity: Suggestion["severity"];
+  confidence: number;
+  description: string;
+  affectedFile: string;
+  targetLine?: number;
+  evidence: string[];
+}
+
+interface AiPromptFile {
+  path: string;
+  snippet: string;
+  startLine: number;
+  endLine: number;
+}
+
+interface AiReviewInput {
+  files: AiPromptFile[];
+  summary: ScanSummary | null;
+  endpoints: Array<{
+    id: string;
+    method: string;
+    url: string;
+    status: EndpointRecord["status"];
+    monthlyCost: number;
+    files: string[];
+  }>;
+  suggestions: Array<{
+    type: Suggestion["type"];
+    severity: Suggestion["severity"];
+    description: string;
+    affectedFiles: string[];
+  }>;
+}
+
+function normalizeDescription(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function trimText(value: string, max: number): string {
+  return value.length <= max ? value : `${value.slice(0, max)}...`;
+}
+
+function clampConfidence(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function estimateAiSavings(type: Suggestion["type"], severity: Suggestion["severity"], baseline: number): number {
+  const baseMultiplier =
+    type === "redundancy" ? 0.35 :
+    type === "n_plus_one" ? 0.3 :
+    type === "cache" ? 0.2 :
+    type === "batch" ? 0.18 :
+    0.12;
+  const severityMultiplier =
+    severity === "high" ? 1 :
+    severity === "medium" ? 0.75 :
+    0.5;
+  return Number((baseline * baseMultiplier * severityMultiplier).toFixed(2));
 }
 
 function mapStatusToSuggestionType(status: EndpointRecord["status"]): Suggestion["type"] | null {
@@ -116,6 +181,7 @@ function buildAggressiveSuggestions(endpoints: EndpointRecord[], suggestions: Su
       estimatedMonthlySavings: estimateSavings(endpoint.status, endpoint.monthlyCost),
       description: buildAggressiveDescription(endpoint, type),
       codeFix: "",
+      source: "local-rule",
     });
   }
 
@@ -167,6 +233,7 @@ function mergeLocalWasteFindings(
       estimatedMonthlySavings,
       description: finding.description,
       codeFix: "",
+      source: "local-rule",
     });
   }
 
@@ -208,6 +275,8 @@ function isHighConfidenceEndpointUrl(url: string): boolean {
   if (!dynamic) return false;
   const token = dynamic[1].trim().toLowerCase();
   if (GENERIC_DYNAMIC_TOKENS.has(token)) return false;
+  // A naked dynamic base URL token is not an endpoint route.
+  if (/base[_-]?url/.test(token)) return false;
   return /base[_-]?url|api|endpoint/i.test(token);
 }
 
@@ -222,6 +291,55 @@ function shouldIncludeSynthetic(call: ApiCallInput): boolean {
   return true;
 }
 
+function normalizePathParams(url: string): string {
+  return url
+    .replace(/\$\{\s*[^}]+\s*\}/g, ":param")
+    .replace(/<[^>]+>/g, ":param")
+    .replace(/\{[^}]+\}/g, ":param");
+}
+
+function stripQueryAndHash(url: string): string {
+  const queryIdx = url.indexOf("?");
+  const hashIdx = url.indexOf("#");
+  const cutAt =
+    queryIdx >= 0 && hashIdx >= 0 ? Math.min(queryIdx, hashIdx) :
+    queryIdx >= 0 ? queryIdx :
+    hashIdx >= 0 ? hashIdx :
+    -1;
+  return cutAt >= 0 ? url.slice(0, cutAt) : url;
+}
+
+function canonicalizeEndpointUrl(url: string): string {
+  const stripped = stripQueryAndHash(url.trim());
+  return normalizePathParams(stripped);
+}
+
+function isDynamicPlaceholderUrl(url: string): boolean {
+  return /^<dynamic:[^>]+>$/i.test(url.trim());
+}
+
+function buildEndpointKey(method: string, url: string): string {
+  return `${method.toUpperCase()} ${canonicalizeEndpointUrl(url)}`;
+}
+
+function pickDisplayUrl(current: string, candidate: string): string {
+  const currentCanonical = canonicalizeEndpointUrl(current);
+  const candidateCanonical = canonicalizeEndpointUrl(candidate);
+
+  const score = (value: string): number => {
+    let s = 0;
+    if (!isDynamicPlaceholderUrl(value)) s += 3;
+    if (value === stripQueryAndHash(value)) s += 2;
+    if (value.includes(":param")) s += 1;
+    if (value.includes("/")) s += 1;
+    return s;
+  };
+
+  const currentScore = score(currentCanonical);
+  const candidateScore = score(candidateCanonical);
+  return candidateScore > currentScore ? candidateCanonical : currentCanonical;
+}
+
 function mergeRemoteAndLocalEndpoints(
   remote: EndpointRecord[],
   localCalls: ApiCallInput[],
@@ -231,15 +349,16 @@ function mergeRemoteAndLocalEndpoints(
   const merged = [...remote];
   const byMethodUrl = new Map<string, EndpointRecord>();
   for (const endpoint of merged) {
-    byMethodUrl.set(`${endpoint.method} ${endpoint.url}`, endpoint);
+    byMethodUrl.set(buildEndpointKey(endpoint.method, endpoint.url), endpoint);
   }
 
   const syntheticByMethodUrl = new Map<string, EndpointRecord>();
   for (const call of localCalls) {
     if (!shouldIncludeSynthetic(call)) continue;
-    const key = `${call.method} ${call.url}`;
+    const key = buildEndpointKey(call.method, call.url);
     if (byMethodUrl.has(key)) {
       const endpoint = byMethodUrl.get(key)!;
+      endpoint.url = pickDisplayUrl(endpoint.url, call.url);
       if (!endpoint.files.includes(call.file)) {
         endpoint.files.push(call.file);
       }
@@ -262,9 +381,9 @@ function mergeRemoteAndLocalEndpoints(
         id: `local-${scanId}-${syntheticByMethodUrl.size + 1}`,
         projectId,
         scanId,
-        provider: inferProviderFromUrl(call.url),
+        provider: inferProviderFromUrl(canonicalizeEndpointUrl(call.url)),
         method: call.method,
-        url: call.url,
+        url: canonicalizeEndpointUrl(call.url),
         files: [call.file],
         callSites: [{
           file: call.file,
@@ -285,6 +404,7 @@ function mergeRemoteAndLocalEndpoints(
     }
 
     const synthetic = syntheticByMethodUrl.get(key)!;
+    synthetic.url = pickDisplayUrl(synthetic.url, call.url);
     if (!synthetic.files.includes(call.file)) {
       synthetic.files.push(call.file);
     }
@@ -325,9 +445,12 @@ export class EcoSidebarProvider implements vscode.WebviewViewProvider {
 
   // Chat state
   private chatHistory: ChatMessage[] = [];
+  private readonly outputChannel: vscode.OutputChannel;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
+    this.outputChannel = vscode.window.createOutputChannel("ECO AI Review");
+    this.context.subscriptions.push(this.outputChannel);
   }
 
   resolveWebviewView(
@@ -378,6 +501,9 @@ export class EcoSidebarProvider implements vscode.WebviewViewProvider {
     switch (message.type) {
       case "startScan":
         await this.handleStartScan();
+        break;
+      case "runAiReview":
+        await this.handleRunAiReview();
         break;
       case "chat":
         await this.handleChat(message.text, message.model);
@@ -501,10 +627,11 @@ export class EcoSidebarProvider implements vscode.WebviewViewProvider {
         getAllEndpoints(projectId, scanResult.scanId),
         getAllSuggestions(projectId, scanResult.scanId),
       ]);
+      const taggedRemoteSuggestions = suggestions.map((s) => ({ ...s, source: s.source ?? "remote" }));
 
       const endpoints = mergeRemoteAndLocalEndpoints(remoteEndpoints, apiCalls, projectId, scanResult.scanId);
       this.lastEndpoints = endpoints;
-      const aggressiveSuggestions = buildAggressiveSuggestions(endpoints, suggestions);
+      const aggressiveSuggestions = buildAggressiveSuggestions(endpoints, taggedRemoteSuggestions);
       const mergedSuggestions = mergeLocalWasteFindings(
         aggressiveSuggestions,
         localWasteFindings,
@@ -528,6 +655,405 @@ export class EcoSidebarProvider implements vscode.WebviewViewProvider {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error during scan";
       this.postMessage({ type: "error", message });
+    }
+  }
+
+  private logAiReview(message: string) {
+    const stamp = new Date().toISOString();
+    this.outputChannel.appendLine(`[${stamp}] ${message}`);
+  }
+
+  private getAiReviewConfig() {
+    const config = vscode.workspace.getConfiguration("eco");
+    return {
+      enabled: config.get<boolean>("aiReview.enabled", true),
+      minConfidence: config.get<number>("aiReview.minConfidence", 0.7),
+      maxFiles: config.get<number>("aiReview.maxFiles", 25),
+      maxCharsPerFile: config.get<number>("aiReview.maxCharsPerFile", 6000),
+      model: config.get<string>("aiReview.model", "gpt-4.1-mini"),
+    };
+  }
+
+  private redactSensitiveText(value: string): string {
+    return value
+      .replace(/sk-[a-zA-Z0-9]{16,}/g, "[REDACTED_OPENAI_KEY]")
+      .replace(/(api[_-]?key|token|secret)\s*[:=]\s*["'`][^"'`\n]{8,}["'`]/gi, "$1=[REDACTED]")
+      .replace(/(authorization\s*:\s*["'`]bearer\s+)[^"'`\n]+/gi, "$1[REDACTED]");
+  }
+
+  private async buildAiReviewInputContext(maxFiles: number, maxCharsPerFile: number): Promise<AiReviewInput> {
+    const scoreByFile = new Map<string, number>();
+    const lineHintByFile = new Map<string, number>();
+    const severityScore: Record<Suggestion["severity"], number> = { high: 4, medium: 2, low: 1 };
+
+    for (const suggestion of this.lastSuggestions) {
+      for (const file of suggestion.affectedFiles) {
+        scoreByFile.set(file, (scoreByFile.get(file) ?? 0) + severityScore[suggestion.severity]);
+        if (suggestion.targetLine && !lineHintByFile.has(file)) {
+          lineHintByFile.set(file, suggestion.targetLine);
+        }
+      }
+    }
+
+    for (const endpoint of this.lastEndpoints) {
+      const endpointScore =
+        endpoint.status === "n_plus_one_risk" || endpoint.status === "redundant" ? 4 :
+        endpoint.status === "rate_limit_risk" ? 3 :
+        endpoint.status === "cacheable" || endpoint.status === "batchable" ? 2 :
+        1;
+      for (const callSite of endpoint.callSites) {
+        scoreByFile.set(callSite.file, (scoreByFile.get(callSite.file) ?? 0) + endpointScore);
+        if (!lineHintByFile.has(callSite.file)) {
+          lineHintByFile.set(callSite.file, callSite.line);
+        }
+      }
+    }
+
+    const rankedFiles = [...scoreByFile.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, Math.max(1, maxFiles))
+      .map(([file]) => file);
+
+    const files: AiPromptFile[] = [];
+    for (let i = 0; i < rankedFiles.length; i += 1) {
+      const file = rankedFiles[i];
+      this.postMessage({
+        type: "aiReviewProgress",
+        stage: `Preparing context (${i + 1}/${rankedFiles.length})`,
+        current: i + 1,
+        total: rankedFiles.length,
+      });
+
+      const excerpt = await readWorkspaceFileExcerpt(file, {
+        centerLine: lineHintByFile.get(file),
+        contextLines: 40,
+        maxChars: maxCharsPerFile,
+      });
+      if (!excerpt || !excerpt.content.trim()) continue;
+      files.push({
+        path: file,
+        startLine: excerpt.startLine,
+        endLine: excerpt.endLine,
+        snippet: this.redactSensitiveText(excerpt.content),
+      });
+    }
+
+    return {
+      files,
+      summary: this.lastSummary,
+      endpoints: this.lastEndpoints.map((endpoint) => ({
+        id: endpoint.id,
+        method: endpoint.method,
+        url: endpoint.url,
+        status: endpoint.status,
+        monthlyCost: endpoint.monthlyCost,
+        files: endpoint.files,
+      })),
+      suggestions: this.lastSuggestions.map((suggestion) => ({
+        type: suggestion.type,
+        severity: suggestion.severity,
+        description: suggestion.description,
+        affectedFiles: suggestion.affectedFiles,
+      })),
+    };
+  }
+
+  private buildAiReviewPrompt(input: AiReviewInput): string {
+    const contract = {
+      findings: [
+        {
+          type: "cache | batch | redundancy | n_plus_one | rate_limit",
+          severity: "high | medium | low",
+          confidence: 0.0,
+          description: "short, specific finding",
+          affectedFile: "path/to/file.ts",
+          targetLine: 1,
+          evidence: ["short reason 1", "short reason 2"],
+        },
+      ],
+    };
+
+    return [
+      "You are an API efficiency code reviewer.",
+      "Analyze only the provided snippets and existing scan context.",
+      "Return ONLY valid JSON with no markdown and no extra text.",
+      "Do not invent files. Use only provided file paths.",
+      "Prefer high precision over recall.",
+      `JSON contract: ${JSON.stringify(contract)}`,
+      `Context: ${JSON.stringify(input)}`,
+    ].join("\n");
+  }
+
+  private parseAndValidateAiFindings(
+    raw: string,
+    validFiles: Set<string>,
+    minConfidence: number
+  ): { accepted: AiFinding[]; filtered: number } {
+    const allowedTypes = new Set<Suggestion["type"]>(["cache", "batch", "redundancy", "n_plus_one", "rate_limit"]);
+    const allowedSeverity = new Set<Suggestion["severity"]>(["high", "medium", "low"]);
+
+    const tryParse = (value: string): unknown => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    };
+
+    let parsed = tryParse(raw);
+    if (!parsed) {
+      const fenced = raw.match(/```json\s*([\s\S]*?)\s*```/i) ?? raw.match(/```\s*([\s\S]*?)\s*```/i);
+      if (fenced) {
+        parsed = tryParse(fenced[1]);
+      }
+    }
+    if (!parsed) {
+      const start = raw.indexOf("{");
+      const end = raw.lastIndexOf("}");
+      if (start >= 0 && end > start) {
+        parsed = tryParse(raw.slice(start, end + 1));
+      }
+    }
+
+    const findings = (parsed as { findings?: unknown })?.findings;
+    if (!Array.isArray(findings)) {
+      return { accepted: [], filtered: 0 };
+    }
+
+    const accepted: AiFinding[] = [];
+    let filtered = 0;
+    for (const entry of findings) {
+      if (accepted.length >= 50) {
+        filtered += 1;
+        continue;
+      }
+      if (!entry || typeof entry !== "object") {
+        filtered += 1;
+        continue;
+      }
+      const candidate = entry as Record<string, unknown>;
+      const type = candidate.type;
+      const severity = candidate.severity;
+      const affectedFile = candidate.affectedFile;
+      const description = candidate.description;
+      if (
+        typeof type !== "string" ||
+        typeof severity !== "string" ||
+        typeof affectedFile !== "string" ||
+        typeof description !== "string"
+      ) {
+        filtered += 1;
+        continue;
+      }
+      if (!allowedTypes.has(type as Suggestion["type"]) || !allowedSeverity.has(severity as Suggestion["severity"])) {
+        filtered += 1;
+        continue;
+      }
+      if (!validFiles.has(affectedFile)) {
+        filtered += 1;
+        continue;
+      }
+
+      const confidence = clampConfidence(Number(candidate.confidence));
+      if (confidence < minConfidence) {
+        filtered += 1;
+        continue;
+      }
+
+      const rawLine = Number(candidate.targetLine);
+      const targetLine = Number.isFinite(rawLine) && rawLine > 0 ? Math.floor(rawLine) : undefined;
+      const evidence = Array.isArray(candidate.evidence)
+        ? candidate.evidence.filter((item): item is string => typeof item === "string").slice(0, 4).map((item) => trimText(item, 180))
+        : [];
+
+      accepted.push({
+        type: type as Suggestion["type"],
+        severity: severity as Suggestion["severity"],
+        confidence,
+        description: trimText(description.trim(), 500),
+        affectedFile,
+        targetLine,
+        evidence,
+      });
+    }
+
+    return { accepted, filtered };
+  }
+
+  private mapAiFindingToSuggestion(finding: AiFinding, index: number): Suggestion {
+    const scanId = this.lastEndpoints[0]?.scanId ?? this.projectId ?? `local-${Date.now()}`;
+    const projectId = this.lastEndpoints[0]?.projectId ?? this.projectId ?? "local";
+    const related = this.lastEndpoints
+      .filter((endpoint) => endpoint.files.includes(finding.affectedFile))
+      .map((endpoint) => endpoint.id);
+    const baselineCost = this.lastSummary?.totalMonthlyCost ?? 0;
+    const relatedCost = this.lastEndpoints
+      .filter((endpoint) => endpoint.files.includes(finding.affectedFile))
+      .reduce((sum, endpoint) => sum + endpoint.monthlyCost, 0);
+    const monthlyBaseline = relatedCost > 0 ? relatedCost : baselineCost;
+
+    return {
+      id: `ai-${Date.now()}-${index + 1}`,
+      projectId,
+      scanId,
+      type: finding.type,
+      severity: finding.severity,
+      affectedEndpoints: related,
+      affectedFiles: [finding.affectedFile],
+      targetLine: finding.targetLine,
+      estimatedMonthlySavings: estimateAiSavings(finding.type, finding.severity, monthlyBaseline),
+      description: finding.description,
+      codeFix: "",
+      source: "ai",
+      confidence: finding.confidence,
+      evidence: finding.evidence,
+      reviewedAt: new Date().toISOString(),
+    };
+  }
+
+  private mergeAiSuggestions(existing: Suggestion[], incoming: Suggestion[]): { merged: Suggestion[]; added: number; filtered: number } {
+    const existingByKey = new Set<string>();
+    const deterministicOverlap = new Map<string, number[]>();
+
+    for (const suggestion of existing) {
+      const file = suggestion.affectedFiles[0] ?? "";
+      const line = suggestion.targetLine ?? 0;
+      const key = `${suggestion.type}|${file}|${line}|${normalizeDescription(suggestion.description)}`;
+      existingByKey.add(key);
+      if (file && suggestion.source !== "ai") {
+        const overlapKey = `${suggestion.type}|${file}`;
+        const lines = deterministicOverlap.get(overlapKey) ?? [];
+        lines.push(line);
+        deterministicOverlap.set(overlapKey, lines);
+      }
+    }
+
+    const aiByKey = new Set<string>();
+    const accepted: Suggestion[] = [];
+    let filtered = 0;
+
+    for (const suggestion of incoming) {
+      const file = suggestion.affectedFiles[0] ?? "";
+      const line = suggestion.targetLine ?? 0;
+      const key = `${suggestion.type}|${file}|${line}|${normalizeDescription(suggestion.description)}`;
+      if (existingByKey.has(key) || aiByKey.has(key)) {
+        filtered += 1;
+        continue;
+      }
+
+      const overlapKey = `${suggestion.type}|${file}`;
+      const overlapLines = deterministicOverlap.get(overlapKey) ?? [];
+      const nearDeterministic = overlapLines.some((knownLine) => Math.abs(knownLine - line) <= 5);
+      if (nearDeterministic) {
+        filtered += 1;
+        continue;
+      }
+
+      aiByKey.add(key);
+      accepted.push(suggestion);
+    }
+
+    return { merged: [...existing, ...accepted], added: accepted.length, filtered };
+  }
+
+  private async handleRunAiReview() {
+    const { enabled, minConfidence, maxFiles, maxCharsPerFile, model } = this.getAiReviewConfig();
+    if (!enabled) {
+      this.postMessage({ type: "aiReviewError", message: "AI review is disabled in settings." });
+      return;
+    }
+    if (this.lastEndpoints.length === 0 && this.lastSuggestions.length === 0) {
+      this.postMessage({ type: "aiReviewError", message: "Run a scan before AI review." });
+      return;
+    }
+
+    const apiKey = await this.context.secrets.get("eco.openaiApiKey");
+    if (!apiKey) {
+      this.postMessage({ type: "needsApiKey", message: "Set your OpenAI API key to run AI review." });
+      return;
+    }
+
+    try {
+      this.postMessage({ type: "aiReviewProgress", stage: "Collecting files..." });
+      const input = await this.buildAiReviewInputContext(maxFiles, maxCharsPerFile);
+      if (input.files.length === 0) {
+        this.postMessage({ type: "aiReviewComplete", added: 0, filtered: 0 });
+        return;
+      }
+
+      this.postMessage({ type: "aiReviewProgress", stage: "Calling model..." });
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: "You are a strict API efficiency reviewer. Return only JSON.",
+            },
+            {
+              role: "user",
+              content: this.buildAiReviewPrompt(input),
+            },
+          ],
+        }),
+      });
+
+      if (response.status === 401) {
+        await this.context.secrets.delete("eco.openaiApiKey");
+        this.postMessage({ type: "needsApiKey", message: "Invalid API key. Please enter a valid key." });
+        return;
+      }
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: { message: "AI review request failed" } }));
+        const errMsg = (errData as { error?: { message?: string } })?.error?.message ?? "AI review request failed";
+        this.postMessage({ type: "aiReviewError", message: errMsg });
+        return;
+      }
+
+      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const raw = data.choices?.[0]?.message?.content ?? "";
+      this.postMessage({ type: "aiReviewProgress", stage: "Validating findings..." });
+      const validFiles = new Set(input.files.map((file) => file.path));
+      const { accepted, filtered } = this.parseAndValidateAiFindings(raw, validFiles, minConfidence);
+      const aiSuggestions = accepted.map((finding, index) => this.mapAiFindingToSuggestion(finding, index));
+      const merged = this.mergeAiSuggestions(this.lastSuggestions, aiSuggestions);
+
+      this.lastSuggestions = merged.merged;
+      const summary = this.lastSummary ?? {
+        totalEndpoints: this.lastEndpoints.length,
+        totalCallsPerDay: this.lastEndpoints.reduce((sum, endpoint) => sum + endpoint.callsPerDay, 0),
+        totalMonthlyCost: this.lastEndpoints.reduce((sum, endpoint) => sum + endpoint.monthlyCost, 0),
+        highRiskCount: 0,
+      };
+      const updatedSummary: ScanSummary = {
+        ...summary,
+        totalEndpoints: Math.max(summary.totalEndpoints, this.lastEndpoints.length),
+        highRiskCount: this.lastSuggestions.filter((suggestion) => suggestion.severity === "high").length,
+      };
+      this.lastSummary = updatedSummary;
+
+      this.logAiReview(
+        `files=${input.files.length} raw=${accepted.length + filtered} accepted=${merged.added} filtered=${filtered + merged.filtered}`
+      );
+
+      this.postMessage({
+        type: "scanResults",
+        endpoints: this.lastEndpoints,
+        suggestions: this.lastSuggestions,
+        summary: updatedSummary,
+      });
+      this.postMessage({ type: "aiReviewComplete", added: merged.added, filtered: filtered + merged.filtered });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "AI review failed";
+      this.logAiReview(`error=${message}`);
+      this.postMessage({ type: "aiReviewError", message });
     }
   }
 

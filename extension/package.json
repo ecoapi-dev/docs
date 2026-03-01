@@ -73,6 +73,37 @@
           "type": "string",
           "default": "**/node_modules/**,**/dist/**,**/build/**,**/.git/**,**/.next/**,**/vendor/**,**/venv/**,**/.venv/**,**/__pycache__/**",
           "description": "Glob pattern for files to exclude from scanning"
+        },
+        "eco.aiReview.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable manual AI second-pass review."
+        },
+        "eco.aiReview.minConfidence": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum confidence for AI findings to be accepted."
+        },
+        "eco.aiReview.maxFiles": {
+          "type": "number",
+          "default": 25,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum number of files to include in AI review context."
+        },
+        "eco.aiReview.maxCharsPerFile": {
+          "type": "number",
+          "default": 6000,
+          "minimum": 500,
+          "maximum": 20000,
+          "description": "Maximum characters per file excerpt sent to AI review."
+        },
+        "eco.aiReview.model": {
+          "type": "string",
+          "default": "gpt-4.1-mini",
+          "description": "OpenAI model used for AI review."
         }
       }
     }

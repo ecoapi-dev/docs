@@ -64,6 +64,10 @@ export interface Suggestion {
   estimatedMonthlySavings: number;
   description: string;
   codeFix: string;
+  source?: "remote" | "local-rule" | "ai";
+  confidence?: number;
+  evidence?: string[];
+  reviewedAt?: string;
 }
 
 export interface GraphNode {

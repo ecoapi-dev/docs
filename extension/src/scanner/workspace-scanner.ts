@@ -36,7 +36,13 @@ function isHighConfidenceUrl(url: string): boolean {
   if (/^https?:\/\//i.test(url)) return true;
   if (url.startsWith("/")) return true;
   if (GENERIC_TEMPLATE_SEGMENT.test(url)) return false;
-  if (/^<dynamic:/i.test(url)) return !isGenericDynamicUrl(url);
+  if (/^<dynamic:/i.test(url)) {
+    if (isGenericDynamicUrl(url)) return false;
+    const token = (url.match(/^<dynamic:([^>]+)>$/i)?.[1] ?? "").toLowerCase();
+    // A lone base URL variable is not an endpoint route.
+    if (/base[_-]?url/.test(token)) return false;
+    return true;
+  }
   return false;
 }
 
@@ -48,6 +54,35 @@ async function readUriText(uri: vscode.Uri): Promise<string> {
 
   const content = await vscode.workspace.fs.readFile(uri);
   return Buffer.from(content).toString("utf-8");
+}
+
+export async function readWorkspaceFileExcerpt(
+  relativePath: string,
+  options?: { centerLine?: number; contextLines?: number; maxChars?: number }
+): Promise<{ content: string; startLine: number; endLine: number } | null> {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  if (!workspaceFolder) return null;
+
+  try {
+    const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, relativePath);
+    const text = await readUriText(fileUri);
+    const lines = text.split("\n");
+    const context = Math.max(options?.contextLines ?? 30, 5);
+    const center = options?.centerLine ? Math.max(1, options.centerLine) : 1;
+    const startLine = Math.max(1, center - context);
+    const endLine = Math.min(lines.length, center + context);
+    const selected = lines.slice(startLine - 1, endLine);
+    let content = selected.join("\n");
+    const maxChars = Math.max(options?.maxChars ?? 6000, 500);
+
+    if (content.length > maxChars) {
+      content = `${content.slice(0, maxChars)}\n/* ...truncated... */`;
+    }
+
+    return { content, startLine, endLine };
+  } catch {
+    return null;
+  }
 }
 
 export async function scanWorkspace(

@@ -8,6 +8,11 @@ interface ResultsPageProps {
   suggestions: Suggestion[];
   summary: ScanSummary;
   endpoints: EndpointRecord[];
+  onRunAiReview: () => void;
+  aiReviewRunning: boolean;
+  aiReviewStage: string;
+  aiReviewError: string;
+  aiReviewStats: { added: number; filtered: number } | null;
 }
 
 type Tab = "findings" | "chat";
@@ -75,6 +80,27 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
+function SourceBadge({ source }: { source?: Suggestion["source"] }) {
+  const label = source === "ai" ? "AI" : source === "local-rule" ? "Rule" : "Remote";
+  return (
+    <span
+      style={{
+        background: "var(--vscode-editorGroupHeader-tabsBackground)",
+        color: "var(--vscode-descriptionForeground)",
+        border: "1px solid var(--vscode-panel-border)",
+        fontSize: "10px",
+        padding: "1px 5px",
+        borderRadius: "10px",
+        fontWeight: 600,
+        flexShrink: 0,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function CodeFix({ codeFix, file, line }: { codeFix: string; file?: string; line?: number }) {
   const [copied, setCopied] = useState(false);
   const { code, language } = extractCode(codeFix);
@@ -116,7 +142,7 @@ function CodeFix({ codeFix, file, line }: { codeFix: string; file?: string; line
               title="Apply fix"
               style={{ fontSize: "11px", gap: "3px", display: "flex", alignItems: "center", color: "var(--vscode-textLink-foreground)" }}
             >
-              <span style={{ fontSize: "11px", fontWeight: 700, lineHeight: 1 }}>✓</span>
+              <span className="codicon codicon-check" style={{ fontSize: "11px" }} />
               apply
             </button>
           )}
@@ -160,13 +186,26 @@ function SuggestionCard({
   target: { file?: string; line?: number };
 }) {
   const firstLine = suggestion.description.split("\n")[0];
-  const descShort = firstLine.length > 90 ? firstLine.slice(0, 90) + "…" : firstLine;
+  const descShort = firstLine.length > 90 ? `${firstLine.slice(0, 90)}...` : firstLine;
 
   return (
     <div className="eco-suggestion">
       <button className="eco-suggestion-header" onClick={onToggle}>
         <span aria-hidden="true" className={`eco-disclosure${expanded ? " open" : ""}`} />
         <TypeBadge type={suggestion.type} />
+        <SourceBadge source={suggestion.source} />
+        {typeof suggestion.confidence === "number" && suggestion.source === "ai" && (
+          <span
+            style={{
+              color: "var(--vscode-descriptionForeground)",
+              fontSize: "10px",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {Math.round(suggestion.confidence * 100)}%
+          </span>
+        )}
         <span style={{ flex: 1, lineHeight: 1.4, overflow: "hidden" }}>{descShort}</span>
         {suggestion.estimatedMonthlySavings > 0 && (
           <span
@@ -177,7 +216,7 @@ function SuggestionCard({
               whiteSpace: "nowrap",
             }}
           >
-            −${suggestion.estimatedMonthlySavings.toFixed(2)}/mo
+            ${suggestion.estimatedMonthlySavings.toFixed(2)}/mo
           </span>
         )}
       </button>
@@ -185,6 +224,15 @@ function SuggestionCard({
       {expanded && (
         <div className="eco-suggestion-body">
           <Markdown content={suggestion.description} />
+          {suggestion.evidence && suggestion.evidence.length > 0 && (
+            <ul style={{ marginTop: "8px", marginBottom: 0, paddingLeft: "18px" }}>
+              {suggestion.evidence.map((item, idx) => (
+                <li key={`${suggestion.id}-e-${idx}`} style={{ fontSize: "11px", color: "var(--vscode-descriptionForeground)" }}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
 
           {suggestion.affectedFiles.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
@@ -360,7 +408,16 @@ function EndpointsList({ endpoints, topBorder }: { endpoints: EndpointRecord[]; 
   );
 }
 
-export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProps) {
+export function ResultsPage({
+  suggestions,
+  summary,
+  endpoints,
+  onRunAiReview,
+  aiReviewRunning,
+  aiReviewStage,
+  aiReviewError,
+  aiReviewStats,
+}: ResultsPageProps) {
   const [tab, setTab] = useState<Tab>("findings");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [chatContext, setChatContext] = useState<SuggestionContext | null>(null);
@@ -404,7 +461,6 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-      {/* Tab bar */}
       <div className="eco-tabs">
         <button
           className={`eco-tab${tab === "findings" ? " active" : ""}`}
@@ -420,6 +476,23 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
         </button>
         <button
           className="eco-btn-icon"
+          onClick={onRunAiReview}
+          disabled={aiReviewRunning}
+          title="Run AI Review"
+          style={{
+            marginLeft: "8px",
+            padding: "0 8px",
+            fontSize: "11px",
+            display: "flex",
+            alignItems: "center",
+            gap: "3px",
+            opacity: aiReviewRunning ? 0.7 : 1,
+          }}
+        >
+          {aiReviewRunning ? "Reviewing..." : "Run AI Review"}
+        </button>
+        <button
+          className="eco-btn-icon"
           onClick={() => postMessage({ type: "openDashboard" })}
           title="Open Dashboard"
           style={{ marginLeft: "auto", padding: "0 8px", fontSize: "11px", display: "flex", alignItems: "center", gap: "3px" }}
@@ -429,9 +502,7 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
         </button>
       </div>
 
-      {/* Findings — always mounted to preserve scroll position; hidden via display */}
       <div className="eco-panel-view" style={{ flex: 1, overflow: "hidden", display: tab === "findings" ? "flex" : "none", flexDirection: "column", minHeight: 0 }}>
-        {/* Summary bar */}
         <div
           style={{
             padding: "5px 12px",
@@ -442,21 +513,38 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
           }}
         >
           {summary.totalEndpoints} endpoints
-          <span style={{ margin: "0 5px", opacity: 0.4 }}>·</span>
+          <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
           {suggestions.length} suggestions
-          <span style={{ margin: "0 5px", opacity: 0.4 }}>·</span>
+          <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
           ${summary.totalMonthlyCost.toFixed(2)}/mo
           {summary.highRiskCount > 0 && (
             <>
-              <span style={{ margin: "0 5px", opacity: 0.4 }}>·</span>
+              <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
               <span style={{ color: "var(--vscode-editorError-foreground)" }}>
                 {summary.highRiskCount} high
               </span>
             </>
           )}
+          {aiReviewRunning && (
+            <>
+              <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
+              <span>{aiReviewStage || "Running AI review..."}</span>
+            </>
+          )}
+          {!aiReviewRunning && aiReviewStats && (
+            <>
+              <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
+              <span>AI added {aiReviewStats.added}, filtered {aiReviewStats.filtered}</span>
+            </>
+          )}
+          {!aiReviewRunning && aiReviewError && (
+            <>
+              <span style={{ margin: "0 5px", opacity: 0.4 }}>|</span>
+              <span style={{ color: "var(--vscode-editorError-foreground)" }}>{aiReviewError}</span>
+            </>
+          )}
         </div>
 
-        {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {suggestions.length === 0 ? (
             <div
@@ -512,7 +600,6 @@ export function ResultsPage({ suggestions, summary, endpoints }: ResultsPageProp
         </div>
       </div>
 
-      {/* Chat — always mounted to preserve message history; hidden via display */}
       <div className="eco-panel-view" style={{ flex: 1, display: tab === "chat" ? "flex" : "none", flexDirection: "column", minHeight: 0 }}>
         <ChatPage context={chatContext} />
       </div>

@@ -37,6 +37,10 @@ export interface Suggestion {
   estimatedMonthlySavings: number;
   description: string;
   codeFix: string;
+  source?: "remote" | "local-rule" | "ai";
+  confidence?: number;
+  evidence?: string[];
+  reviewedAt?: string;
 }
 
 export interface ScanSummary {
@@ -63,6 +67,9 @@ export type HostMessage =
   | { type: "scanProgress"; file: string; index: number; total: number; endpointsSoFar: number }
   | { type: "scanComplete" }
   | { type: "scanResults"; endpoints: EndpointRecord[]; suggestions: Suggestion[]; summary: ScanSummary }
+  | { type: "aiReviewProgress"; stage: string; current?: number; total?: number }
+  | { type: "aiReviewComplete"; added: number; filtered: number }
+  | { type: "aiReviewError"; message: string }
   | { type: "chatStreaming"; chunk: string }
   | { type: "chatDone"; fullContent: string }
   | { type: "chatError"; message: string }
