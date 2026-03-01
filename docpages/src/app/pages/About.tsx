@@ -135,7 +135,7 @@ export default function About() {
             className="text-[16px] max-w-xl mx-auto"
             style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Inter', sans-serif", lineHeight: 1.7 }}
           >
-            A full-stack platform to analyze your codebase's API usage, estimate costs, surface risks, and suggest optimizations — across three integrated surfaces.
+            A full-stack platform to analyze your codebase's API usage, estimate costs, surface risks, and suggest optimizations across three integrated surfaces.
           </p>
         </Motion.div>
 
@@ -146,7 +146,7 @@ export default function About() {
             badge="REST API"
             title="EcoApi Backend"
             subtitle="Cloudflare Workers · Hono · D1 SQLite"
-            description="The core engine. Send a list of API calls found in your codebase and EcoAPI analyses them — detecting redundant calls, N+1 patterns, cacheable endpoints, batch opportunities, and rate-limit risks. It calculates monthly cost estimates per provider, groups endpoints by file or provider, and generates actionable optimization suggestions with code fixes."
+            description="The core engine. Send a list of API calls found in your codebase and EcoAPI analyses them, detecting redundant calls, N+1 patterns, cacheable endpoints, batch opportunities, and rate-limit risks. It calculates monthly cost estimates per provider, groups endpoints by file or provider, and generates actionable optimization suggestions with code fixes."
             features={[
               { icon: Code2, label: 'Scan endpoint', desc: 'POST raw API call data extracted from your source code' },
               { icon: DollarSign, label: 'Cost analytics', desc: 'Per-provider cost breakdown with monthly estimates' },
@@ -161,12 +161,12 @@ export default function About() {
             badge="IDE Extension"
             title="IDE Extension"
             subtitle="VS Code Extension Host · TypeScript · Webview UI"
-            description="Install the EcoApi extension and scan your entire workspace without leaving your editor. Because EcoApi is built on the VS Code extension host, it runs natively in any compatible editor — VS Code, Cursor, Windsurf, and more. The extension scans TypeScript, JavaScript, Python, Go, and Ruby files, detects API calls using regex patterns across popular HTTP libraries (fetch, axios, requests, got), and sends them to the EcoAPI backend for analysis. Results appear in a sidebar panel with findings, suggestions, and an AI chat assistant."
+            description="Install the EcoApi extension and scan your entire workspace without leaving your editor. Because EcoApi is built on the VS Code extension host, it runs natively in any compatible editor: VS Code, Cursor, Windsurf, and more. The extension scans TypeScript, JavaScript, Python, Go, and Ruby files, detects API calls using regex patterns across popular HTTP libraries (fetch, axios, requests, got), and sends them to the EcoAPI backend for analysis. Results appear in a sidebar panel with findings, suggestions, and an AI chat assistant."
             features={[
               { icon: Zap, label: 'One-click scan', desc: 'Scan your workspace instantly from the sidebar' },
               { icon: AlertTriangle, label: 'Inline findings', desc: 'Severity-grouped suggestions with code fix previews' },
               { icon: MessageSquare, label: 'AI chat', desc: 'Ask GPT-4o about any endpoint or suggestion' },
-              { icon: Globe, label: 'Extension host compatible', desc: 'VS Code, Cursor, Windsurf — any host-compatible editor' },
+              { icon: Globe, label: 'Extension host compatible', desc: 'VS Code, Cursor, Windsurf, any host-compatible editor' },
             ]}
             delay={0.2}
           />

@@ -593,7 +593,7 @@ export default function Docs() {
               <p
                 style={{ fontFamily: "'Inter', sans-serif", fontSize: '16px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.7 }}
               >
-                Complete reference for every EcoApi endpoint — request shapes, response formats, rate limits, and curl examples.
+                Complete reference for every EcoApi endpoint: request shapes, response formats, rate limits, and curl examples.
               </p>
             </Motion.div>
 
@@ -606,7 +606,7 @@ export default function Docs() {
                   optimization suggestions with estimated savings.
                 </p>
                 <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '14px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>
-                  EcoApi also computes <strong style={{ color: 'rgba(255,255,255,0.8)' }}>sustainability stats</strong> — electricity (kWh),
+                  EcoApi also computes <strong style={{ color: 'rgba(255,255,255,0.8)' }}>sustainability stats</strong>: electricity (kWh),
                   water (L), and CO₂ (g) footprint estimated from API call volume, with an AI vs non-AI breakdown, so your
                   team can measure the environmental cost of every API call.
                 </p>
@@ -1073,7 +1073,7 @@ npm run dev                             # → http://localhost:8787`}</CodeBlock
                 id="cost-by-file"
                 method="GET"
                 path="/projects/:id/cost/by-file"
-                description="Paginated cost breakdown grouped by source file — identify which files are responsible for the most API spend."
+                description="Paginated cost breakdown grouped by source file: identify which files are responsible for the most API spend."
                 queryParams={[
                   { name: 'page',  type: 'number', desc: 'Page number (default: 1)' },
                   { name: 'limit', type: 'number', desc: 'Items per page (default: 20)' },
@@ -1134,7 +1134,7 @@ npm run dev                             # → http://localhost:8787`}</CodeBlock
               {/* Energy constants table */}
               <Motion.div {...FADE(0.35)} className="rounded-2xl border p-6 backdrop-blur-xl" style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.08)' }}>
                 <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '12px' }}>
-                  Energy constants — api/src/config/sustainability.ts
+                  Energy constants: api/src/config/sustainability.ts
                 </p>
                 <DataTable
                   headers={['Provider', 'kWh / call', 'AI?']}
@@ -1323,12 +1323,12 @@ npm run dev                             # → http://localhost:8787`}</CodeBlock
                   headers={['Code', 'Meaning']}
                   rows={[
                     ['200 OK',                    'Successful GET or PATCH'],
-                    ['201 Created',               'Successful POST — resource created'],
+                    ['201 Created',               'Successful POST, resource created'],
                     ['204 No Content',            'Successful DELETE'],
                     ['400 Bad Request',           'Malformed JSON or missing/invalid Content-Type'],
                     ['404 Not Found',             'Resource does not exist'],
                     ['422 Unprocessable Entity',  'Field-level validation failure'],
-                    ['429 Too Many Requests',     'Scan rate limit exceeded — retry after 60s'],
+                    ['429 Too Many Requests',     'Scan rate limit exceeded, retry after 60s'],
                     ['500 Internal Server Error', 'Unexpected worker error'],
                   ]}
                 />
@@ -1374,7 +1374,7 @@ curl -s https://your-worker.workers.dev/projects/{projectId}/sustainability`}</C
               </SectionCard>
 
               {/* ── 17. Pricing Table ───────────────────────────────── */}
-              <SectionCard id="pricing" icon={DollarSign} badge="Pricing" title="Provider Pricing" subtitle="api/src/config/pricing.ts — cost per API call" delay={0.45}>
+              <SectionCard id="pricing" icon={DollarSign} badge="Pricing" title="Provider Pricing" subtitle="api/src/config/pricing.ts: cost per API call" delay={0.45}>
                 <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.65, marginBottom: '14px' }}>
                   EcoApi uses these per-call costs to estimate monthly spend. Provider detection is URL keyword matching.
                   Unrecognized URLs fall back to the internal rate.

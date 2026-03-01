@@ -138,7 +138,7 @@ export default function AiChat() {
       <div className="mx-4 mt-3 px-3 py-2 bg-[#4EAA57]/10 border border-[#4EAA57]/20 rounded-lg flex items-center gap-2">
         <Leaf size={12} className="text-[#4EAA57] shrink-0" />
         <span className="text-[10px] flex-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          Context loaded: <span className="text-white">Cache /v1/models response</span> — Redundant Call in src/ai/utils.ts
+          Context loaded: <span className="text-white">Cache /v1/models response</span> Redundant Call in src/ai/utils.ts
         </span>
         <ChevronRight size={12} style={{ color: 'rgba(255,255,255,0.35)' }} />
       </div>

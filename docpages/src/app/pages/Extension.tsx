@@ -113,7 +113,7 @@ function FieldTable({ fields }: { fields: Field[] }) {
             <tr key={f.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <td style={{ padding: '7px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#60a5fa' }}>{f.name}</td>
               <td style={{ padding: '7px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#fbbf24' }}>{f.type}</td>
-              <td style={{ padding: '7px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>{f.default ?? '—'}</td>
+              <td style={{ padding: '7px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>{f.default ?? '-'}</td>
               <td style={{ padding: '7px 10px', fontFamily: "'Inter', sans-serif", fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{f.desc}</td>
             </tr>
           ))}
@@ -458,7 +458,7 @@ export default function Extension() {
                 Extension Docs
               </h1>
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '16px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.7 }}>
-                VSCode extension that scans your workspace for API call patterns, estimates costs, and surfaces optimization opportunities — without leaving your editor.
+                VSCode extension that scans your workspace for API call patterns, estimates costs, and surfaces optimization opportunities, without leaving your editor.
               </p>
             </Motion.div>
 
@@ -472,7 +472,7 @@ export default function Extension() {
               delay={0.05}
             >
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '16px' }}>
-                ECO is a VS Code extension that analyzes your entire codebase for API call patterns. Install it and scan your workspace in one click from the Activity Bar sidebar. Because it runs on the VS Code extension host, it works natively in any compatible editor — VS Code, Cursor, Windsurf, and more.
+                ECO is a VS Code extension that analyzes your entire codebase for API call patterns. Install it and scan your workspace in one click from the Activity Bar sidebar. Because it runs on the VS Code extension host, it works natively in any compatible editor: VS Code, Cursor, Windsurf, and more.
               </p>
               <div
                 className="grid grid-cols-1 sm:grid-cols-2 gap-3"
@@ -482,7 +482,7 @@ export default function Extension() {
                   { icon: AlertTriangle, label: 'Risk detection', desc: 'Surfaces N+1, redundant calls, cacheable endpoints, and rate-limit risks' },
                   { icon: DollarSign, label: 'Cost estimation', desc: 'Monthly cost estimates per API provider' },
                   { icon: MessageSquare, label: 'AI chat', desc: 'Ask GPT-4o about any finding or suggestion directly in the sidebar' },
-                  { icon: Globe, label: 'Editor compatible', desc: 'VS Code, Cursor, Windsurf — any extension-host-compatible editor' },
+                  { icon: Globe, label: 'Editor compatible', desc: 'VS Code, Cursor, Windsurf, any extension-host-compatible editor' },
                   { icon: LayoutDashboard, label: 'Open Dashboard', desc: 'Launch a full local dashboard in the browser from the sidebar button' },
                 ].map(({ icon: Icon, label, desc }) => (
                   <div
@@ -563,10 +563,10 @@ npm run build`}</CodeBlock>
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '10px' }}>
                 Run these in parallel in two terminals, then press F5 to launch the Extension Development Host:
               </p>
-              <CodeBlock>{`# Terminal 1 — extension backend
+              <CodeBlock>{`# Terminal 1: extension backend
 cd extension && npm run watch:ext
 
-# Terminal 2 — sidebar webview
+# Terminal 2: sidebar webview
 cd extension && npm run watch:webview`}</CodeBlock>
             </SectionCard>
 
@@ -633,14 +633,14 @@ cd extension && npm run watch:webview`}</CodeBlock>
               icon={LayoutDashboard}
               badge="Dashboard"
               title="Dashboard View"
-              subtitle="Full local dashboard launched from the sidebar — no remote API required"
+              subtitle="Full local dashboard launched from the sidebar, no remote API required"
               delay={0.25}
             >
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '16px' }}>
-                After scanning your workspace, click <strong style={{ color: 'rgba(255,255,255,0.75)' }}>Open Dashboard</strong> in the sidebar panel. This launches a full React dashboard in your browser backed entirely by local scan data — the same data collected by the extension scan, with no remote API calls.
+                After scanning your workspace, click <strong style={{ color: 'rgba(255,255,255,0.75)' }}>Open Dashboard</strong> in the sidebar panel. This launches a full React dashboard in your browser backed entirely by local scan data, the same data collected by the extension scan, with no remote API calls.
               </p>
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '16px' }}>
-                The dashboard is built with <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>VITE_LOCAL_MODE=true</code>, so navigating to <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>/</code> automatically redirects to <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>/projects/local</code> — the local project view.
+                The dashboard is built with <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>VITE_LOCAL_MODE=true</code>, so navigating to <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>/</code> automatically redirects to <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>/projects/local</code>, the local project view.
               </p>
               <div
                 className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5"
@@ -686,13 +686,13 @@ npm run build:dashboard`}</CodeBlock>
               subtitle="Get up and running in minutes"
               delay={0.3}
             >
-              <SubHeading>Option 1 — automated script</SubHeading>
+              <SubHeading>Option 1: automated script</SubHeading>
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '10px' }}>
                 Run <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>start-extension-full.sh</code> from the project root. It installs all dependencies (including the dashboard), builds everything, and opens the extension folder in your editor.
               </p>
               <CodeBlock>{`bash start-extension-full.sh`}</CodeBlock>
 
-              <SubHeading>Option 2 — manual steps</SubHeading>
+              <SubHeading>Option 2: manual steps</SubHeading>
               <CodeBlock>{`# 1. Install dependencies
 cd extension && npm install
 cd webview  && npm install && cd ..
