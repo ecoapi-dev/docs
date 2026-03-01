@@ -142,9 +142,12 @@ export default function Graph() {
 
     // ── Force simulation ────────────────────────────────────────────────────
     const simulation = d3.forceSimulation<SimNode>(simNodes)
+      .velocityDecay(0.5)
+      .alphaDecay(0.02)
       .force('link', d3.forceLink<SimNode, SimLink>(simLinks).id(d => d.id).distance(117).strength(0.4))
-      .force('charge', d3.forceManyBody<SimNode>().strength(-360))
-      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('charge', d3.forceManyBody<SimNode>().strength(-180))
+      .force('x', d3.forceX<SimNode>(width / 2).strength(0.08))
+      .force('y', d3.forceY<SimNode>(height / 2).strength(0.08))
       .force('collide', d3.forceCollide<SimNode>(d => nodeRadius(d, maxCalls) + 20));
 
     // ── Edges (drawn before nodes so nodes sit on top) ───────────────────────

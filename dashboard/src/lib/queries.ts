@@ -86,6 +86,7 @@ export function useCreateScan(projectId: string) {
       qc.invalidateQueries({ queryKey: ["endpoints", projectId] });
       qc.invalidateQueries({ queryKey: ["suggestions", projectId] });
       qc.invalidateQueries({ queryKey: ["graph", projectId] });
+      qc.invalidateQueries({ queryKey: ["sustainability", projectId] });
     },
   });
 }
