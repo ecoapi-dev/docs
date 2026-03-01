@@ -119,6 +119,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+::selection {
+  background: rgba(255,255,255,0.15);
+  color: inherit;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

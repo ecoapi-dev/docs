@@ -47,7 +47,8 @@ function CodeBlock({ children }: { children: string }) {
         overflowX: 'auto',
         color: 'rgba(255,255,255,0.75)',
         margin: 0,
-        whiteSpace: 'pre',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
       }}
     >
       <code>{children}</code>
@@ -447,7 +448,6 @@ const TOC_SECTIONS = [
 ];
 
 function TOCSidebar({ activeSection }: { activeSection: string }) {
-  const theme = useTheme();
   return (
     <nav
       className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide"
@@ -490,14 +490,12 @@ function TOCSidebar({ activeSection }: { activeSection: string }) {
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      (e.currentTarget as HTMLAnchorElement).style.color = theme.btnGradient[0];
-                      (e.currentTarget as HTMLAnchorElement).style.background = `${theme.btnGradient[0]}10`;
+                      (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
                       (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.3)';
-                      (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
                     }
                   }}
                 >
