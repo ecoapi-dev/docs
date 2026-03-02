@@ -22,23 +22,18 @@ EcoAPI turns parsed API call data into actionable diagnostics:
 
 ### API
 - **Cloudflare Workers** — serverless runtime
-- **Hono** — web framework (Workers-compatible, Express-like)
-- **Cloudflare D1** — SQLite database (persistent)
-- **Cloudflare AI** — Llama 3.1 8B for the `/chat` endpoint
+- **Hono** — web framework
+- **Cloudflare D1** — SQLite database
 - **TypeScript** — strict mode
 
 ### Dashboard
-- **React 18** + **React Router v7** — SPA with client-side routing
-- **Vite** — build tool, deployed to Cloudflare Pages
-- **TanStack Query v5** — data fetching and caching
-- **Tailwind CSS v4** — utility-first styling
-- **D3.js** — graph/network visualization
-- **Radix UI** — accessible UI primitives
+- **React 18** + **React Router v7**
+- **TanStack Query v5**, **Tailwind CSS v4**, **D3.js**, **Radix UI**
 
 ### VSCode Extension
 - **TypeScript** extension backend
-- **React** webview UI (built with Vite + esbuild)
-- **OpenAI** — AI chat within the sidebar
+- **React** webview UI
+- **AI chat** — OpenAI (default) or Cloudflare AI (optional)
 
 ## Project Structure
 
@@ -138,383 +133,33 @@ extension/                  # VSCode extension
   eco-api-analyzer-0.1.0.vsix
 scripts/
   install-dashboard.sh      # Install dashboard npm dependencies
-start-extension.sh          # Full extension dev setup (install + build + open VSCode)
+  start-extension.sh        # Full extension dev setup (install + build + open VSCode)
 ```
 
-## API Setup
+## API
 
-```bash
-cd api
-npm install
-npx wrangler d1 create eco-db          # create D1 database
-# paste the returned database_id into api/wrangler.toml
-npx wrangler kv namespace create rate-limit
-# paste the returned id and preview_id into api/wrangler.toml under [[kv_namespaces]]
-npm run db:migrate:local               # apply schema + seed data
-npm run dev                            # start local dev server
-```
+The API is live at **https://api.ecoapi.dev** — no setup required.
 
-The app seeds one project + scan via migration for immediate exploration.
-
-## API Commands
-
-Run from the `api/` directory:
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start local dev server (`wrangler dev`) |
-| `npm run deploy` | Deploy to Cloudflare Workers |
-| `npm run typecheck` | TypeScript type check |
-| `npm run db:migrate:local` | Apply D1 migrations locally |
-| `npm run db:migrate:remote` | Apply D1 migrations to production |
-
-## Dashboard Setup
-
-```bash
-cd dashboard
-npm install
-npm run dev        # local dev server (Vite), points to https://api.ecoapi.dev by default
-npm run build      # production build → dist/
-npm run preview    # preview the production build locally
-```
-
-Or use the helper script from the repo root:
-```bash
-bash scripts/install-dashboard.sh
-```
-
-### Deploy to Cloudflare Pages
-
-In the Cloudflare Pages new project settings:
-
-| Setting | Value |
-|---------|-------|
-| Root directory | `dashboard` |
-| Build command | `VITE_API_URL=https://api.ecoapi.dev npm run build` |
-| Build output directory | `dist` |
-| Framework preset | None (or Vite) |
+Full API documentation is available at **https://ecoapi.dev**.
 
 ## VSCode Extension
 
-The `extension/` folder contains a VSCode extension that runs ECO analysis directly inside your editor — no remote API server needed.
+Runs ECO analysis directly inside your editor — no remote API server needed. Scans your workspace for API call patterns, shows cost/risk diagnostics in the sidebar, and opens the full dashboard locally. AI chat is optional — uses OpenAI by default, or Cloudflare AI (Llama 3.1 8B) if preferred.
 
-### What it does
-
-- Scans your workspace for API call patterns (TS, JS, Python, Go, Java, Ruby)
-- Shows results in a persistent **sidebar panel** (Activity Bar)
-- Detects cost, N+1 patterns, missing caching, and unbatched calls
-- AI chat via OpenAI to explain issues and suggest fixes
-- **"Open Dashboard"** button launches the full dashboard in the browser backed by your scan data — served locally, no remote API required
-
-### Running in development (F5)
-
-Use the root script for a one-step setup:
+### Quick start
 
 ```bash
-bash start-extension.sh
+bash scripts/start-extension.sh
 ```
 
-Or manually:
+Then press **F5** in VSCode to launch the Extension Development Host, and click the **ECO leaf icon** in the Activity Bar.
 
-1. Open the **`extension/`** folder as your workspace in VSCode:
-   ```bash
-   code extension/
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   cd webview && npm install && cd ..
-   ```
-3. Build the extension (dashboard + webview + extension backend):
-   ```bash
-   npm run build
-   ```
-4. Press **F5** inside the `extension/` workspace — this runs the build and launches an **Extension Development Host** window.
-5. Click the **ECO leaf icon** in the Activity Bar to open the sidebar.
+### Install from .vsix
 
-### Running from the .vsix
-
-1. Open the Command Palette (`Ctrl+Shift+P`) → **"Extensions: Install from VSIX..."**
+1. Command Palette (`Ctrl+Shift+P`) → **"Extensions: Install from VSIX..."**
 2. Select `extension/eco-api-analyzer-0.1.0.vsix`
 3. Reload VSCode, then click the ECO icon in the Activity Bar.
 
-To build a fresh `.vsix` (includes the dashboard):
-```bash
-cd extension && npm run build && npm run package
-```
-
-### Extension build commands
-
-Run from the `extension/` directory:
-
-| Command | Description |
-|---------|-------------|
-| `npm run build` | Full build (dashboard + webview + extension backend) |
-| `npm run build:ext` | Extension backend only (esbuild) |
-| `npm run build:webview` | Webview React UI only |
-| `npm run build:dashboard` | Dashboard build → copies to `dashboard-dist/` |
-| `npm run watch:ext` | Watch mode for extension backend |
-| `npm run watch:webview` | Watch mode for webview |
-| `npm run package` | Package into `.vsix` |
-
-### Dev workflow (watch mode)
-
-Run both watchers in separate terminals, then **Ctrl+Shift+P → "Developer: Reload Window"** after changes:
-
-```bash
-# Terminal 1 — extension backend
-cd extension && npm run watch:ext
-
-# Terminal 2 — React webview
-cd extension && npm run watch:webview
-```
-
-Dashboard changes require a manual rebuild:
-```bash
-cd extension && npm run build:dashboard
-```
-
-### Extension settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `eco.openaiApiKey` | `""` | OpenAI API key (prompted on first use if unset) |
-| `eco.openaiModel` | `gpt-4o-mini` | OpenAI model for chat |
-| `eco.scanGlob` | `**/*.{ts,tsx,js,jsx,py,go,java,rb}` | Files to include |
-| `eco.excludeGlob` | `**/node_modules/**,...` | Files to exclude |
-
 ---
 
-## Core API Behavior
-
-- CORS headers on all responses
-- `X-Request-Id` on every response
-- JSON validation with `422` field-level errors
-- `400` for malformed JSON or missing/invalid `Content-Type`
-- Consistent error shape:
-
-```json
-{
-  "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "Project with id 'abc123' not found",
-    "status": 404
-  }
-}
-```
-
-## Rate Limiting & Payload Limits
-
-- **Payload cap**: `apiCalls` arrays are capped at 2000 items — returns `422` if exceeded
-- **Scan rate limit**: `POST /projects/:id/scans` is limited to **10 scans per 60 seconds per project** via Cloudflare KV — returns `429` if exceeded
-
-## Frequency Heuristics
-
-| Input | Calls/day |
-|-------|-----------|
-| `per-request` | 1000 |
-| `per-session` | 300 |
-| `hourly` | 24 |
-| `daily` | 1 |
-| `weekly` | 1/7 |
-| `N/day` | N |
-| unknown | 100 |
-
-## Pricing Table
-
-Defined in `api/src/config/pricing.ts`:
-
-| Provider | Cost per call (USD) |
-|----------|-------------------|
-| Stripe | $0.01 |
-| OpenAI | $0.006 |
-| Twilio | $0.0075 |
-| SendGrid | $0.001 |
-| AWS S3 | $0.0004 |
-| Google Maps | $0.005 |
-| Internal/fallback | $0.0001 |
-
-## Example Scan Payload
-
-```json
-{
-  "apiCalls": [
-    {
-      "file": "src/checkout.ts",
-      "line": 47,
-      "method": "GET",
-      "url": "/api/users/:id",
-      "library": "axios",
-      "frequency": "per-request"
-    }
-  ]
-}
-```
-
-## API Reference
-
-### Health
-
-```
-GET /health
-```
-
-### Projects
-
-```
-POST   /projects
-GET    /projects?page=1&limit=20&name=my-app&sort=created_at&order=desc
-GET    /projects/:id
-PATCH  /projects/:id
-DELETE /projects/:id
-```
-
-### Scans
-
-```
-POST   /projects/:id/scans
-GET    /projects/:id/scans?page=1&limit=20&sort=created_at&order=desc
-GET    /projects/:id/scans/latest
-GET    /projects/:id/scans/:scanId
-```
-
-### Endpoints
-
-```
-GET    /projects/:id/endpoints?provider=stripe&status=cacheable&method=GET&sort=monthly_cost&order=desc
-GET    /projects/:id/endpoints/:endpointId
-```
-
-### Suggestions
-
-```
-GET    /projects/:id/suggestions?type=cache,batch&severity=high&sort=estimated_savings&order=desc
-GET    /projects/:id/suggestions/:suggestionId
-```
-
-### Graph
-
-```
-GET    /projects/:id/graph?cluster_by=provider|file|cost
-```
-
-### Cost Analytics
-
-```
-GET    /projects/:id/cost
-GET    /projects/:id/cost/by-provider?page=1&limit=20
-GET    /projects/:id/cost/by-file?page=1&limit=20
-```
-
-### Sustainability
-
-```
-GET    /projects/:id/sustainability
-```
-
-Returns estimated environmental impact computed from the project's latest scan:
-
-```json
-{
-  "data": {
-    "electricity": { "dailyKwh": 4.5, "monthlyKwh": 135.0 },
-    "water":       { "dailyLiters": 8.1, "monthlyLiters": 243.0 },
-    "co2":         { "dailyGrams": 1737.0, "monthlyGrams": 52110.0 },
-    "aiCallsPerDay": 1500,
-    "totalCallsPerDay": 1501,
-    "aiCallsPercentage": 99.9,
-    "byProvider": [
-      {
-        "provider": "openai",
-        "isAi": true,
-        "callsPerDay": 1500,
-        "dailyKwh": 4.5,
-        "dailyWaterLiters": 8.1,
-        "dailyCo2Grams": 1737.0
-      }
-    ]
-  }
-}
-```
-
-**Energy constants** (defined in `api/src/config/sustainability.ts`):
-
-| Provider | kWh per call | AI? |
-|----------|-------------|-----|
-| OpenAI | 0.003 | Yes |
-| Google Maps | 0.00003 | No |
-| Stripe | 0.00002 | No |
-| Twilio | 0.00001 | No |
-| AWS S3 | 0.000008 | No |
-| SendGrid / Internal | 0.000005 | No |
-
-Water intensity: **1.8 L/kWh** (Microsoft Azure data center disclosures)
-CO2 intensity: **386 g/kWh** (US EPA eGRID 2022 national average)
-
-### Providers
-
-```
-GET    /providers?page=1&limit=20
-GET    /providers/:name
-```
-
-### Chat
-
-```
-POST   /chat
-```
-
-Powered by Cloudflare AI (Llama 3.1 8B). Accepts a `messages` array and returns an AI response.
-
-## Response Formats
-
-**Single resource:**
-```json
-{ "data": { "...": "resource" } }
-```
-
-**Paginated list:**
-```json
-{
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 47,
-    "totalPages": 3,
-    "hasNext": true,
-    "hasPrev": false
-  }
-}
-```
-
-**DELETE:** `204 No Content`
-
-## Example Workflow
-
-```bash
-# 1. Create project
-curl -s -X POST https://your-worker.workers.dev/projects \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-app"}'
-
-# 2. Trigger scan
-curl -s -X POST https://your-worker.workers.dev/projects/{projectId}/scans \
-  -H "Content-Type: application/json" \
-  -d '{"apiCalls":[{"file":"src/main.ts","line":21,"method":"GET","url":"https://api.stripe.com/v1/customers","library":"fetch","frequency":"1200/day"}]}'
-
-# 3. View endpoints
-curl -s https://your-worker.workers.dev/projects/{projectId}/endpoints
-
-# 4. View suggestions
-curl -s https://your-worker.workers.dev/projects/{projectId}/suggestions
-
-# 5. View cost breakdown
-curl -s https://your-worker.workers.dev/projects/{projectId}/cost/by-provider
-
-# 6. View sustainability stats
-curl -s https://your-worker.workers.dev/projects/{projectId}/sustainability
-```
-
-
-Copyright © 2026 Andres Lopez, Aslan Wang, Donggyu Yoon. All rights reserved.   
+Copyright © 2026 Andres Lopez, Aslan Wang, Donggyu Yoon. All rights reserved.
