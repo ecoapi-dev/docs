@@ -581,7 +581,7 @@ export default function Docs() {
 
         {/* Right: scrollable content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto scrollbar-hide px-6 md:px-10">
-          <div className="pb-24 space-y-5">
+          <div className="pb-24 space-y-5" style={{ maxWidth: 'calc(100% * 6 / 7)', margin: '0 auto' }}>
             {/* Hero */}
             <Motion.div {...FADE(0)} className="px-4 pt-14 pb-6">
               <h1

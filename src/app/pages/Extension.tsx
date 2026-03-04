@@ -3,6 +3,7 @@ import { motion as Motion } from 'motion/react';
 import { Link } from 'react-router';
 import { useTheme } from '../theme-context';
 import { Particles } from '../components/particles';
+import { FaWindows, FaLinux, FaApple } from 'react-icons/fa';
 import {
   Leaf,
   ArrowLeft,
@@ -56,6 +57,41 @@ function CodeBlock({ children }: { children: string }) {
     >
       <code>{children}</code>
     </pre>
+  );
+}
+
+// ─── OSBadges ─────────────────────────────────────────────────────────────────
+
+const OS_LIST = [
+  { Icon: FaApple, label: 'macOS' },
+  { Icon: FaWindows, label: 'Windows' },
+  { Icon: FaLinux, label: 'Linux' },
+];
+
+function OSBadges() {
+  return (
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {OS_LIST.map(({ Icon, label }) => (
+        <span
+          key={label}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '3px 10px',
+            borderRadius: '999px',
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            fontFamily: "'Inter', sans-serif",
+            fontSize: '11px',
+            color: 'rgba(255,255,255,0.55)',
+          }}
+        >
+          <Icon size={12} color="rgba(255,255,255,0.55)" />
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -447,7 +483,7 @@ export default function Extension() {
 
         {/* Main scrollable content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto scrollbar-hide px-6 md:px-10">
-          <div className="space-y-5 pb-24">
+          <div className="space-y-5 pb-24" style={{ maxWidth: 'calc(100% * 6 / 7)', margin: '0 auto' }}>
 
             {/* Hero */}
             <Motion.div {...FADE(0)} className="px-4 pt-14 pb-6">
@@ -522,10 +558,19 @@ export default function Extension() {
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '12px' }}>
                 Open the <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>extension/</code> folder in VS Code. Build the extension first (see Setup below), then press <strong style={{ color: 'rgba(255,255,255,0.75)' }}>F5</strong> to launch an Extension Development Host with the extension loaded.
               </p>
-              <SubHeading>Package .vsix</SubHeading>
-              <CodeBlock>{`cd extension
-npx @vscode/vsce package --no-dependencies
-# outputs eco-api-analyzer-*.vsix`}</CodeBlock>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <SubHeading>Build & package .vsix (local install)</SubHeading>
+                <OSBadges />
+              </div>
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '10px' }}>
+                Use the provided build script — it handles dependencies, build, and packaging in one step. Run in a bash terminal from the project root (Git Bash / WSL on Windows — not PowerShell or CMD):
+              </p>
+              <CodeBlock>{`bash extension/scripts/build-vsix.sh
+# → outputs eco-api-analyzer-*.vsix in extension/
+
+# Install (pick one)
+code --install-extension eco-api-analyzer-*.vsix
+# or: Ctrl+Shift+P → "Extensions: Install from VSIX..."`}</CodeBlock>
             </SectionCard>
 
             {/* Setup & Build */}
@@ -686,13 +731,26 @@ npm run build:dashboard`}</CodeBlock>
               subtitle="Get up and running in minutes"
               delay={0.3}
             >
-              <SubHeading>Option 1: automated script</SubHeading>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <SubHeading>Option 1: install as .vsix (recommended)</SubHeading>
+                <OSBadges />
+              </div>
               <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '10px' }}>
-                Run <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>start-extension-full.sh</code> from the project root. It installs all dependencies (including the dashboard), builds everything, and opens the extension folder in your editor.
+                Use the build script to install all dependencies, build everything, and produce a <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>.vsix</code> file — no dev environment needed. Run in a bash terminal (Git Bash / WSL on Windows — not PowerShell or CMD):
+              </p>
+              <CodeBlock>{`bash extension/scripts/build-vsix.sh
+
+# Then install the generated .vsix
+code --install-extension eco-api-analyzer-*.vsix
+# or: Ctrl+Shift+P → "Extensions: Install from VSIX..."`}</CodeBlock>
+
+              <SubHeading>Option 2: automated script (for developing on the extension)</SubHeading>
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: '10px' }}>
+                For contributors and developers working on the extension itself. Run <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>start-extension-full.sh</code> from the project root — it installs all dependencies (including the dashboard), builds everything, and opens the extension folder in your editor ready for F5 development.
               </p>
               <CodeBlock>{`bash start-extension-full.sh`}</CodeBlock>
 
-              <SubHeading>Option 2: manual steps</SubHeading>
+              <SubHeading>Option 3: manual dev steps (F5)</SubHeading>
               <CodeBlock>{`# 1. Install dependencies
 cd extension && npm install
 cd webview  && npm install && cd ..
